@@ -45,8 +45,23 @@ class DALSpec extends Specification with IsolatedMockFactory with After {
 
       // Run and check the future
       db.run {
+        import h2.driver.api._
         h2.create
       } must beEqualTo((): Unit).await
+    }
+
+    "insert user" in { implicit context: ExecutionEnv =>
+
+      // Configure stubs
+      (dataSource.createConnection _).when().returns(connection)
+      (connection.prepareStatement (_: String, _: Array[java.lang.String])).when("insert into \"PICTURES\" (\"PIC_URL\")  values (?)", *).returns(preparedStatement).once
+      // (connection.prepareStatement (_: String)).when("create table \"PICTURES\" (\"PIC_URL\" VARCHAR(254) NOT NULL,\"PIC_ID\" INTEGER PRIMARY KEY AUTOINCREMENT)").returns(preparedStatement).once
+
+      // Run and check the future
+      db.run {
+        import h2.driver.api._
+        h2.insert(User("name1", Picture("http://pics/default")))
+      } must throwA(new NoSuchElementException("Invoker.first")).await
     }
   }
 
@@ -85,6 +100,7 @@ class DALSpec extends Specification with IsolatedMockFactory with After {
 
       // Run and check the future
       db.run {
+        import sqlite.driver.api._
         sqlite.insert(Picture("http://pics/default"))
       } must throwA(new NoSuchElementException("Invoker.first")).await
     }
@@ -98,9 +114,37 @@ class DALSpec extends Specification with IsolatedMockFactory with After {
 
       // Run and check the future
       db.run {
+        import sqlite.driver.api._
         sqlite.insert(User("name1", Picture("http://pics/default")))
-      } must throwA(new NoSuchElementException("Invoker.first")).await
+      } must beEqualTo((): Unit).await
     }
+
+    "user results" in { implicit context: ExecutionEnv =>
+
+      // Configure stubs
+      (dataSource.createConnection _).when().returns(connection)
+      (connection.prepareStatement (_: String)).when("select \"USER_NAME\", \"PIC_ID\", \"USER_ID\" from \"USERS\"").returns(preparedStatement).once
+
+      // Run and check the future
+      db.run {
+        import sqlite.driver.api._
+        sqlite.users.result
+      } must beEqualTo(List(0)).await
+    }
+
+    "picture results" in { implicit context: ExecutionEnv =>
+
+      // Configure stubs
+      (dataSource.createConnection _).when().returns(connection)
+      (connection.prepareStatement (_: String)).when("select \"PIC_URL\", \"PIC_ID\" from \"PICTURES\"").returns(preparedStatement).once
+
+      // Run and check the future
+      db.run {
+        import sqlite.driver.api._
+        sqlite.pictures.result
+      } must beEqualTo(List(0)).await
+    }
+
   }
 
   def after = {
