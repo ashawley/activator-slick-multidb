@@ -7,6 +7,8 @@ scalaVersion := "2.11.6"
 mainClass in Compile := Some("SimpleExample")
 
 libraryDependencies ++= List(
+  "org.specs2" %% "specs2-core" % "3.6.2" % "test",
+  "org.specs2" %% "specs2-mock" % "3.6.2" % "test",
   "com.typesafe.slick" %% "slick" % "3.1.0-RC2",
   "org.slf4j" % "slf4j-nop" % "1.7.10",
   "com.h2database" % "h2" % "1.4.187",
