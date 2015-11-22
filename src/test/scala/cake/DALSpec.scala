@@ -4,7 +4,7 @@ import org.specs2.mutable.After
 import org.scalamock.specs2.IsolatedMockFactory
 import org.specs2.matcher.ThrownExpectations
 
-import slick.driver.{H2Driver, SQLiteDriver}
+import slick.driver.{H2Driver, SQLiteDriver, MySQLDriver}
 import slick.jdbc.JdbcBackend.Database
 import slick.util.AsyncExecutor
 import slick.dbio.DBIO
@@ -21,6 +21,7 @@ class DALSpec extends Specification with IsolatedMockFactory with After {
 
   val h2 = new DAL(H2Driver)
   val sqlite = new DAL(SQLiteDriver)
+  val mysql = new DAL(MySQLDriver)
 
   "H2 driver" should {
 
@@ -142,6 +143,88 @@ class DALSpec extends Specification with IsolatedMockFactory with After {
       db.run {
         import sqlite.driver.api._
         sqlite.pictures.result
+      } must beEqualTo(List(0)).await
+    }
+
+  }
+
+  "MySQL driver" should {
+
+    "have a config" in {
+      Database.forConfig("mysql") must throwA[com.typesafe.config.ConfigException]
+    }
+
+    "have a DAL" in {
+      mysql must beAnInstanceOf[DAL]
+    }
+
+    "be an instance of a database" in {
+      db must beAnInstanceOf[Database]
+    }
+
+    "create" in { implicit context: ExecutionEnv =>
+
+      // Configure stubs
+      (dataSource.createConnection _).when().returns(connection)
+      (connection.prepareStatement (_: String)).when("create table `USERS` (`USER_NAME` TEXT NOT NULL,`PIC_ID` INTEGER NOT NULL,`USER_ID` INTEGER AUTO_INCREMENT PRIMARY KEY)").returns(preparedStatement).once
+      (connection.prepareStatement (_: String)).when("create table `PICTURES` (`PIC_URL` TEXT NOT NULL,`PIC_ID` INTEGER AUTO_INCREMENT PRIMARY KEY)").returns(preparedStatement).once
+
+      // Run and check the future
+      db.run {
+        mysql.create
+      } must beEqualTo((): Unit).await
+    }
+
+    "insert picture" in { implicit context: ExecutionEnv =>
+
+      // Configure stubs
+      (dataSource.createConnection _).when().returns(connection)
+      (connection.prepareStatement (_: String, _: Array[java.lang.String])).when("insert into `PICTURES` (`PIC_URL`)  values (?)", *).returns(preparedStatement).once
+
+      // Run and check the future
+      db.run {
+        import mysql.driver.api._
+        mysql.insert(Picture("http://pics/default"))
+      } must throwA(new NoSuchElementException("Invoker.first")).await
+    }
+
+    "insert user" in { implicit context: ExecutionEnv =>
+
+      // Configure stubs
+      (dataSource.createConnection _).when().returns(connection)
+      (connection.prepareStatement (_: String, _: Array[java.lang.String])).when("insert into `PICTURES` (`PIC_URL`)  values (?)", *).returns(preparedStatement).once
+      // (connection.prepareStatement (_: String)).when("create table \"PICTURES\" (\"PIC_URL\" VARCHAR(254) NOT NULL,\"PIC_ID\" INTEGER PRIMARY KEY AUTOINCREMENT)").returns(preparedStatement).once
+
+      // Run and check the future
+      db.run {
+        import mysql.driver.api._
+        mysql.insert(User("name1", Picture("http://pics/default")))
+      } must throwA(new NoSuchElementException("Invoker.first")).await
+    }
+
+    "user results" in { implicit context: ExecutionEnv =>
+
+      // Configure stubs
+      (dataSource.createConnection _).when().returns(connection)
+      (connection.prepareStatement (_: String)).when("select `USER_NAME`, `PIC_ID`, `USER_ID` from `USERS`").returns(preparedStatement).once
+
+      // Run and check the future
+      db.run {
+        import mysql.driver.api._
+        mysql.users.result
+      } must beEqualTo(List(0)).await
+    }
+
+    "picture results" in { implicit context: ExecutionEnv =>
+
+      // Configure stubs
+      (dataSource.createConnection _).when().returns(connection)
+      (connection.prepareStatement (_: String)).when("select `PIC_URL`, `PIC_ID` from `PICTURES`").returns(preparedStatement).once
+
+      // Run and check the future
+      db.run {
+        import mysql.driver.api._
+        mysql.pictures.result
       } must beEqualTo(List(0)).await
     }
 
